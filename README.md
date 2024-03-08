@@ -1,4 +1,4 @@
-# Portfolio Monsters Microservice
+# Portfolio Battles Microservice
 
 ![Cover Image](./public/images/battles-ms.svg)
 
