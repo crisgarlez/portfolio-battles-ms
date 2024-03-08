@@ -1,28 +1,29 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { lastValueFrom } from 'rxjs';
 import { Battle } from './battle';
 import { Monster } from './monster';
+import { BattleDto } from './battle.dto';
 
 @Injectable()
 export class BattlesService {
+  private readonly logger = new Logger(BattlesService.name);
+
   constructor(
     @Inject('MONSTERS_MS') private client: ClientProxy,
     @Inject('BATTLE_HISTORY_MS') private historyClient: ClientProxy,
   ) {}
 
-  async startBattle(data) {
-    console.log('data:', data);
+  async startBattle(data: BattleDto) {
+    this.logger.debug('startBattle...');
 
     const { monseterOneCode, monseterTwoCode } = data;
 
     let monsterData$ = this.client.send<any>('find-monster-by-code', {
-      id: monseterOneCode,
+      code: monseterOneCode,
     });
 
     let monsterData = await lastValueFrom(monsterData$);
-
-    console.log('MonsterA: ' + monsterData);
 
     const monsterA = new Monster();
     monsterA.code = monsterData.code;
@@ -32,15 +33,13 @@ export class BattlesService {
     monsterA.hp = monsterData.hp;
     monsterA.speed = monsterData.speed;
 
-    console.log('monsterA:', monsterA);
+    this.logger.debug('MonsterA:', JSON.stringify(monsterA));
 
     monsterData$ = this.client.send<any>('find-monster-by-code', {
-      id: monseterTwoCode,
+      code: monseterTwoCode,
     });
 
     monsterData = await lastValueFrom(monsterData$);
-
-    console.log('MonsterB: ' + monsterData);
 
     const monsterB = new Monster();
     monsterB.code = monsterData.code;
@@ -50,7 +49,7 @@ export class BattlesService {
     monsterB.hp = monsterData.hp;
     monsterB.speed = monsterData.speed;
 
-    console.log('monsterB:', monsterB);
+    this.logger.debug('MonsterB:', JSON.stringify(monsterB));
 
     const battle = new Battle();
     battle.monsterA = monsterA;
@@ -58,9 +57,11 @@ export class BattlesService {
 
     const winner: Monster = await battle.fight(monsterA, monsterB);
 
+    this.logger.debug('winner:', JSON.stringify(winner));
+
     const loser: Monster = winner.code == monsterA.code ? monsterB : monsterA;
 
-    const history$ = this.historyClient.emit<any>('create-reccord-topic', {
+    this.historyClient.emit<any>('create-reccord-topic', {
       id: battle.getId(),
       battletime: new Date().getTime(),
       loserid: loser.code,
@@ -70,10 +71,6 @@ export class BattlesService {
       monstera: monsterA.code,
       monsterb: monsterB.code,
     });
-
-    // const history = await lastValueFrom(history$);
-
-    // console.log('history:', history);
 
     return { winner };
   }
